@@ -14,7 +14,10 @@ const PORT = process.env.PORT || 3000;
 
 // Cấu hình API
 const configPath = path.join(__dirname, 'config.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+let config = {};
+if (fs.existsSync(configPath)) {
+    config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+}
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));

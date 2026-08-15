@@ -4,7 +4,16 @@ const path = require('path');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const configPath = path.join(__dirname, 'config.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+let config = {
+    apiEndpoint: "https://tenapi.cn/v2/video",
+    method: "POST",
+    headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+};
+if (fs.existsSync(configPath)) {
+    Object.assign(config, JSON.parse(fs.readFileSync(configPath, 'utf8')));
+}
 
 /**
  * Phân tích URL thông qua HTML (Bypass bảo mật) hoặc API
