@@ -45,12 +45,18 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
     } else {
         console.log(`[INFO] Phát hiện định dạng MP4. Đang tải file...`);
         try {
+            const isHongguoCDN = videoUrl.includes('qznovel.com');
             let axiosConfig = {
                 method: 'GET',
                 url: videoUrl,
                 responseType: 'stream',
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    ...(isHongguoCDN && {
+                        'Referer': 'https://novelquickapp.com/',
+                        'Origin': 'https://novelquickapp.com',
+                        'Accept': 'video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8'
+                    })
                 }
             };
 

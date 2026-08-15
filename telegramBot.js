@@ -262,18 +262,26 @@ if (telegramToken) {
                 }
                 
                 const proxyUrl = currentProxy ? currentProxy.proxyUrl : null;
+
+                // CDN Hồng Quả (qznovel.com) chỉ cho phép IP Trung Quốc truy cập.
+                // Nếu proxy không phải IP TQ → cảnh báo người dùng đổi IP.
+                const isHongguoLink = url.includes('novelquickapp.com');
+                if (isHongguoLink && currentProxy) {
+                    const loc = (currentProxy.location || '').toLowerCase();
+                    const isChineseIp = !loc.includes('việt') && !loc.includes('viet') && !loc.includes('miền') && !loc.includes('mien') && !loc.includes('bắc') && !loc.includes('nam') && !loc.includes('trung');
+                    if (!isChineseIp) {
+                        await bot.sendMessage(chatId, `⚠️ *Cảnh báo:* IP hiện tại (\`${currentProxy.ip}\` - ${currentProxy.location}) là IP Việt Nam. CDN Hồng Quả chỉ cho phép IP Trung Quốc tải về.\nĐang thử tải... nếu thất bại, gõ \`/newip\` vài lần cho đến khi lấy được IP Trung Quốc rồi thử lại.`, { parse_mode: 'Markdown' });
+                    }
+                }
+
                 const videoInfo = await parseVideoUrl(url, proxyUrl);
 
                 if (videoInfo && videoInfo.url) {
                     await bot.editMessageText(`⏳ Đang tải video: ${videoInfo.title}...`, { chat_id: chatId, message_id: processingMsg.message_id });
 
                     const safeTitle = videoInfo.title.replace(/[\\/:*?"<>|]/g, '');
-                    // Link CDN Hồng Quả (qznovel.com) bind theo IP lấy link:
-                    // nếu dùng proxy khác/rotate để download → 403.
-                    // CDN này công khai nên không cần proxy khi tải.
-                    const isHongguoCDN = videoInfo.url.includes('qznovel.com');
-                    const downloadProxy = isHongguoCDN ? null : proxyUrl;
-                    const videoPath = await downloadVideo(videoInfo.url, safeTitle, downloadProxy);
+                    // Dùng cùng proxy cho cả download để tránh IP mismatch
+                    const videoPath = await downloadVideo(videoInfo.url, safeTitle, proxyUrl);
                     
                     const stats = fs.statSync(videoPath);
                     const fileSizeMB = stats.size / (1024 * 1024);
