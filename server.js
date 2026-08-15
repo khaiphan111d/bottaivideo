@@ -10,7 +10,7 @@ const open = require('open');
 require('./telegramBot');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Cấu hình API
 const configPath = path.join(__dirname, 'config.json');
@@ -51,7 +51,9 @@ app.post('/api/download', async (req, res) => {
 });
 
 app.listen(PORT, async () => {
-    console.log(`[INFO] Server đang chạy tại: http://localhost:${PORT}`);
-    // Tự động mở trình duyệt
-    await open(`http://localhost:${PORT}`);
+    console.log(`[INFO] Server đang chạy tại port: ${PORT}`);
+    // Tự động mở trình duyệt (chỉ hoạt động trên máy tính cá nhân, sẽ bỏ qua trên server)
+    try {
+        await open(`http://localhost:${PORT}`);
+    } catch (e) {}
 });

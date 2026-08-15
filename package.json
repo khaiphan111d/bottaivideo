@@ -13,6 +13,7 @@
     "fluent-ffmpeg": "^2.1.2",
     "https-proxy-agent": "^9.1.0",
     "node-telegram-bot-api": "^1.2.0",
-    "open": "^8.4.2"
+    "open": "^8.4.2",
+    "pg": "^8.23.0"
   }
 }
