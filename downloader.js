@@ -3,6 +3,7 @@ const path = require('path');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const FormData = require('form-data');
 
 /**
  * Tải video MP4 hoặc M3U8 từ URL
@@ -89,6 +90,40 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
     }
 }
 
+/**
+ * Upload video lên Litterbox (hỗ trợ file tới 1GB, xoá sau 12h)
+ * @param {string} filePath Đường dẫn tới file cần upload
+ * @returns {Promise<string>} URL tải file trả về
+ */
+async function uploadToThirdParty(filePath) {
+    const fileSizeMB = (fs.statSync(filePath).size / (1024 * 1024)).toFixed(1);
+    console.log(`[INFO] Đang upload file lớn (${fileSizeMB}MB) lên Litterbox...`);
+
+    const form = new FormData();
+    form.append('reqtype', 'fileupload');
+    form.append('time', '12h'); // File sống 12h
+    form.append('fileToUpload', fs.createReadStream(filePath));
+
+    const response = await axios.post('https://litterbox.catbox.moe/api.php', form, {
+        headers: {
+            ...form.getHeaders()
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+        timeout: 0 // Không giới hạn timeout - file lớn cần thời gian upload dài
+    });
+
+    const responseText = typeof response.data === 'string' ? response.data.trim() : '';
+
+    if (responseText.startsWith('https://')) {
+        console.log(`[SUCCESS] Đã upload thành công lên Litterbox: ${responseText}`);
+        return responseText;
+    } else {
+        throw new Error(`Litterbox từ chối upload (${fileSizeMB}MB): ` + responseText);
+    }
+}
+
 module.exports = {
-    downloadVideo
+    downloadVideo,
+    uploadToThirdParty
 };

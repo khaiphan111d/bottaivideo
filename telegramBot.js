@@ -5,7 +5,7 @@ if (typeof TelegramBot !== 'function') {
 const fs = require('fs');
 const path = require('path');
 const { parseVideoUrl } = require('./parser');
-const { downloadVideo } = require('./downloader');
+const { downloadVideo, uploadToThirdParty } = require('./downloader');
 const { getKiotProxy, forceNewKiotProxy } = require('./proxyHelper');
 const db = require('./db'); // Sử dụng Database
 
@@ -270,14 +270,31 @@ if (telegramToken) {
                     const safeTitle = videoInfo.title.replace(/[\\/:*?"<>|]/g, '');
                     const videoPath = await downloadVideo(videoInfo.url, safeTitle, proxyUrl);
                     
-                    await bot.editMessageText("📤 Đang gửi video...", { chat_id: chatId, message_id: processingMsg.message_id });
-                    
+                    const stats = fs.statSync(videoPath);
+                    const fileSizeMB = stats.size / (1024 * 1024);
+                    console.log(`[INFO] Dung lượng file đã tải: ${fileSizeMB.toFixed(1)}MB`);
+
                     try {
                         let finalCaption = `🎬 **${videoInfo.title}**\n\n`;
                         finalCaption += currentProxy ? `🛡 *Đã tải ẩn danh*\n🌐 **IP Kết Nối:** \`${currentProxy.ip}\`` : `⚠️ *Tải bằng IP gốc*`;
 
-                        await bot.sendVideo(chatId, videoPath, { caption: finalCaption, parse_mode: 'Markdown' });
-                        bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+                        if (fileSizeMB > 49.5) {
+                            await bot.editMessageText(`⏳ Dung lượng video lớn (${fileSizeMB.toFixed(1)}MB). Đang upload lên web để lấy link tải...`, { chat_id: chatId, message_id: processingMsg.message_id });
+                            const uploadLink = await uploadToThirdParty(videoPath);
+                            
+                            let webCaption = `🎬 **${videoInfo.title}**\n\n`;
+                            webCaption += `⚠️ *Video quá lớn để gửi trực tiếp \(>50MB\)\.*\n`;
+                            webCaption += `👉 [BẤM VÀO ĐÂY ĐỂ TẢI VIDEO VỀ](${uploadLink})\n`;
+                            webCaption += `_\(Link tải tự động xóa sau 12 giờ\)_\n\n`;
+                            webCaption += currentProxy ? `🛡 *Đã tải ẩn danh*\n🌐 **IP Kết Nối:** \`${currentProxy.ip}\`` : `⚠️ *Tải bằng IP gốc*`;
+                            
+                            await bot.sendMessage(chatId, webCaption, { parse_mode: 'Markdown', disable_web_page_preview: true });
+                            bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+                        } else {
+                            await bot.editMessageText("📤 Đang gửi video...", { chat_id: chatId, message_id: processingMsg.message_id });
+                            await bot.sendVideo(chatId, videoPath, { caption: finalCaption, parse_mode: 'Markdown' });
+                            bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
+                        }
 
                         // Lưu vào Database
                         try {
@@ -289,10 +306,14 @@ if (telegramToken) {
                         }
 
                     } catch (sendError) {
-                        bot.sendMessage(chatId, `❌ Lỗi khi gửi video: ${sendError.message}`);
+                        bot.sendMessage(chatId, `❌ Lỗi khi gửi/upload video: ${sendError.message}`);
+                    } finally {
+                        // Luôn xóa file tạm dù thành công hay lỗi
+                        fs.unlink(videoPath, (err) => {
+                            if (err) console.error(`[WARN] Không thể xóa file tạm: ${videoPath}`, err.message);
+                            else console.log(`[INFO] Đã dọn file tạm: ${videoPath}`);
+                        });
                     }
-
-                    fs.unlink(videoPath, () => {});
                 } else {
                     bot.sendMessage(chatId, "❌ Không tìm thấy link video gốc.");
                 }
