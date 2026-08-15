@@ -69,10 +69,10 @@ async function parseVideoUrl(shareUrl, proxyUrl = null) {
                     };
                 }
             }
-            throw new Error("Không thể trích xuất video trực tiếp từ HTML.");
+            console.log("[WARN] Không tìm thấy dữ liệu video trực tiếp trong HTML Hồng Quả, chuyển sang dùng API dự phòng...");
         }
 
-        // Nếu là link mạng khác, dùng API dự phòng
+        // Nếu là link mạng khác hoặc phân tích HTML thất bại, dùng API dự phòng
         console.log(`[INFO] Sử dụng API dự phòng: ${config.apiEndpoint}`);
         let response;
         
