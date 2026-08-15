@@ -268,7 +268,12 @@ if (telegramToken) {
                     await bot.editMessageText(`⏳ Đang tải video: ${videoInfo.title}...`, { chat_id: chatId, message_id: processingMsg.message_id });
 
                     const safeTitle = videoInfo.title.replace(/[\\/:*?"<>|]/g, '');
-                    const videoPath = await downloadVideo(videoInfo.url, safeTitle, proxyUrl);
+                    // Link CDN Hồng Quả (qznovel.com) bind theo IP lấy link:
+                    // nếu dùng proxy khác/rotate để download → 403.
+                    // CDN này công khai nên không cần proxy khi tải.
+                    const isHongguoCDN = videoInfo.url.includes('qznovel.com');
+                    const downloadProxy = isHongguoCDN ? null : proxyUrl;
+                    const videoPath = await downloadVideo(videoInfo.url, safeTitle, downloadProxy);
                     
                     const stats = fs.statSync(videoPath);
                     const fileSizeMB = stats.size / (1024 * 1024);
