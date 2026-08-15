@@ -38,9 +38,36 @@ async function parseVideoUrl(shareUrl, proxyUrl = null) {
         // Nếu là link từ novelquickapp.com (Hồng Quả / Fanqie)
         if (extractedUrl.includes('novelquickapp.com')) {
             console.log("[INFO] Phát hiện link Hồng Quả, đang lấy link video trực tiếp không qua API...");
-            const htmlRes = await axios.get(extractedUrl, axiosConfig);
+
+            // ── BƯỚC 1: Lấy URL thực sau khi redirect (link /s/ là shortlink) ──
+            const desktopUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+            const step1Config = {
+                maxRedirects: 0,
+                validateStatus: s => s < 400,
+                headers: { 'User-Agent': desktopUA }
+            };
+            if (proxyUrl) step1Config.httpsAgent = new HttpsProxyAgent(proxyUrl);
+
+            let targetUrl = extractedUrl;
+            try {
+                const step1Res = await axios.get(extractedUrl, step1Config);
+                if (step1Res.status >= 300 && step1Res.headers.location) {
+                    targetUrl = step1Res.headers.location;
+                    console.log(`[INFO] Redirect Hồng Quả -> ${targetUrl.substring(0, 80)}...`);
+                }
+            } catch (redirectErr) {
+                console.log("[WARN] Không lấy được redirect, dùng URL gốc:", redirectErr.message);
+            }
+
+            // ── BƯỚC 2: Fetch trang đích bằng Desktop UA (quan trọng!) ──
+            const step2Config = {
+                headers: { 'User-Agent': desktopUA }
+            };
+            if (proxyUrl) step2Config.httpsAgent = new HttpsProxyAgent(proxyUrl);
+
+            const htmlRes = await axios.get(targetUrl, step2Config);
             let html = htmlRes.data;
-            
+
             // Đảm bảo html là một chuỗi (phòng trường hợp Axios tự parse thành Object/JSON)
             if (typeof html !== 'string') {
                 html = JSON.stringify(html);
@@ -49,27 +76,31 @@ async function parseVideoUrl(shareUrl, proxyUrl = null) {
             // Tìm kiếm chuỗi JSON trong window._ROUTER_DATA
             const routerDataMatch = html.match(/window\._ROUTER_DATA\s*=\s*({[\s\S]*?})<\/script>/);
             if (routerDataMatch && routerDataMatch[1]) {
-                const routerData = JSON.parse(routerDataMatch[1]);
-                
-                // Trích xuất play_url và title
-                let pageData = null;
-                // Tìm pageData trong cấu trúc động
-                const loaderData = routerData.loaderData || {};
-                for (let key in loaderData) {
-                    if (loaderData[key] && loaderData[key].pageData && loaderData[key].pageData.series_data) {
-                        pageData = loaderData[key].pageData.series_data;
-                        break;
+                try {
+                    const routerData = JSON.parse(routerDataMatch[1]);
+                    
+                    // Trích xuất play_url và title
+                    let pageData = null;
+                    const loaderData = routerData.loaderData || {};
+                    for (let key in loaderData) {
+                        if (loaderData[key] && loaderData[key].pageData && loaderData[key].pageData.series_data) {
+                            pageData = loaderData[key].pageData.series_data;
+                            break;
+                        }
                     }
-                }
 
-                if (pageData && pageData.play_url) {
-                    return {
-                        title: pageData.title || `hongguo_video_${Date.now()}`,
-                        url: pageData.play_url
-                    };
+                    if (pageData && pageData.play_url) {
+                        console.log(`[INFO] ✅ Lấy thành công video Hồng Quả: ${pageData.title}`);
+                        return {
+                            title: pageData.title || `hongguo_video_${Date.now()}`,
+                            url: pageData.play_url
+                        };
+                    }
+                } catch (parseErr) {
+                    console.log("[WARN] Lỗi parse JSON _ROUTER_DATA:", parseErr.message);
                 }
             }
-            console.log("[WARN] Không tìm thấy dữ liệu video trực tiếp trong HTML Hồng Quả, chuyển sang dùng API dự phòng...");
+            console.log("[WARN] Không tìm thấy dữ liệu video trong HTML Hồng Quả, chuyển sang API dự phòng...");
         }
 
         // Nếu là link mạng khác hoặc phân tích HTML thất bại, dùng API dự phòng
