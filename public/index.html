@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hồng Quả Downloader</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-animation">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="glass-container">
+        <header>
+            <h1>Hồng Quả Downloader</h1>
+            <p>Tải video ngắn chất lượng cao không giới hạn</p>
+        </header>
+
+        <main>
+            <form id="download-form">
+                <div class="input-group">
+                    <input type="text" id="url-input" placeholder="Dán Share URL hoặc Link video vào đây..." required autocomplete="off">
+                    <div class="focus-border"></div>
+                </div>
+                <button type="submit" id="download-btn">
+                    <span class="btn-text">Bắt đầu tải xuống</span>
+                    <div class="spinner hidden" id="loading-spinner"></div>
+                </button>
+            </form>
+
+            <div id="status-message" class="status-box hidden"></div>
+        </main>
+        
+        <footer>
+            <p>Video sẽ được lưu tại <code>thư mục hiện hành</code></p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
