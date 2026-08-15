@@ -91,9 +91,11 @@ async function parseVideoUrl(shareUrl, proxyUrl = null) {
 
                     if (pageData && pageData.play_url) {
                         console.log(`[INFO] ✅ Lấy thành công video Hồng Quả: ${pageData.title}`);
+                        // Loại bỏ giới hạn 30s của link chia sẻ
+                        const fullVideoUrl = pageData.play_url.replace(/&end=\d+/g, '').replace(/&start=\d+/g, '');
                         return {
                             title: pageData.title || `hongguo_video_${Date.now()}`,
-                            url: pageData.play_url
+                            url: fullVideoUrl
                         };
                     }
                 } catch (parseErr) {
