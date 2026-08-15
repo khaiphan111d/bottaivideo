@@ -186,9 +186,18 @@ if (telegramToken) {
                 return;
             }
             const newKey = text.replace('/setproxy ', '').trim();
+            // Hỗ trợ 2 format:
+            //   KiotProxy  : chuỗi key bắt đầu bằng chữ K (vd: K79b98924b07...)
+            //   Proxy302   : host:port:user:pass (4 phần)
+            const parts = newKey.split(':');
+            const isStaticProxy = parts.length === 4;
             try {
                 await db.query("INSERT INTO system_config (key, value) VALUES ('global_kiotproxy_key', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(newKey)]);
-                bot.sendMessage(chatId, `✅ Đã lưu KiotProxy Key thành công vào Database!`);
+                if (isStaticProxy) {
+                    bot.sendMessage(chatId, `✅ Đã lưu **Proxy302 Static** thành công!\n🌐 Host: \`${parts[0]}:${parts[1]}\`\n👤 User: \`${parts[2]}\``, { parse_mode: 'Markdown' });
+                } else {
+                    bot.sendMessage(chatId, `✅ Đã lưu **KiotProxy Key** thành công vào Database!`);
+                }
             } catch (err) {
                 bot.sendMessage(chatId, "❌ Lỗi DB: " + err.message);
             }
@@ -197,9 +206,25 @@ if (telegramToken) {
 
         const currentKiotKey = await getGlobalKiotProxyKey();
 
+        // Nhận diện loại proxy: static (Proxy302) hay dynamic (KiotProxy)
+        function isStaticProxyKey(key) {
+            if (!key) return false;
+            const parts = key.split(':');
+            return parts.length === 4; // host:port:user:pass
+        }
+        function buildStaticProxyUrl(key) {
+            const [host, port, user, pass] = key.split(':');
+            return { ip: host, proxyUrl: `http://${user}:${pass}@${host}:${port}`, location: '🌐 Static Proxy302' };
+        }
+
         if (text === '/newip') {
             if (!currentKiotKey) {
-                bot.sendMessage(chatId, "⚠️ Bạn chưa thiết lập Key KiotProxy.", {parse_mode: 'Markdown'});
+                bot.sendMessage(chatId, "⚠️ Bạn chưa thiết lập Key Proxy.", {parse_mode: 'Markdown'});
+                return;
+            }
+            if (isStaticProxyKey(currentKiotKey)) {
+                const p = buildStaticProxyUrl(currentKiotKey);
+                bot.sendMessage(chatId, `ℹ️ Bạn đang dùng **Proxy302 Static IP** (IP cố định).\n🌐 IP: \`${p.ip}\`\nKhông cần đổi IP — đây là IP tĩnh Trung Quốc ổn định.`, { parse_mode: 'Markdown' });
                 return;
             }
             const checkMsg = await bot.sendMessage(chatId, "⏳ Đang gửi yêu cầu đổi IP mới lên hệ thống...");
@@ -220,12 +245,17 @@ if (telegramToken) {
 
         if (text === '/checkip') {
             if (!currentKiotKey) {
-                bot.sendMessage(chatId, "⚠️ Bạn chưa thiết lập Key KiotProxy.", {parse_mode: 'Markdown'});
+                bot.sendMessage(chatId, "⚠️ Bạn chưa thiết lập Key Proxy.", {parse_mode: 'Markdown'});
                 return;
             }
             const checkMsg = await bot.sendMessage(chatId, "⏳ Đang kiểm tra trạng thái mạng...");
             try {
-                const currentProxy = await getKiotProxy(currentKiotKey, 'random');
+                let currentProxy;
+                if (isStaticProxyKey(currentKiotKey)) {
+                    currentProxy = buildStaticProxyUrl(currentKiotKey);
+                } else {
+                    currentProxy = await getKiotProxy(currentKiotKey, 'random');
+                }
                 if (currentProxy) {
                     bot.editMessageText(`✅ **Hệ thống đang kết nối Proxy an toàn**\n🌐 **Địa chỉ IP:** \`${currentProxy.ip}\`\n📍 **Vị trí:** ${currentProxy.location}`, {
                         chat_id: chatId,
@@ -247,11 +277,18 @@ if (telegramToken) {
                 const processingMsg = await bot.sendMessage(chatId, "⏳ Bắt đầu xử lý...");
                 let currentProxy = null;
                 if (currentKiotKey) {
-                    await bot.editMessageText(`⏳ Đang kết nối KiotProxy...`, { chat_id: chatId, message_id: processingMsg.message_id });
-                    try {
-                        currentProxy = await getKiotProxy(currentKiotKey, 'random');
-                    } catch (err) {
-                        bot.sendMessage(chatId, `⚠️ Lỗi lấy Proxy: ${err.message}. Thử tải bằng IP gốc.`);
+                    if (isStaticProxyKey(currentKiotKey)) {
+                        // Proxy302 static: dùng ngay, không cần gọi API
+                        currentProxy = buildStaticProxyUrl(currentKiotKey);
+                        await bot.editMessageText(`⏳ Đang phân tích link qua Proxy302 Static IP: ${currentProxy.ip}...`, { chat_id: chatId, message_id: processingMsg.message_id });
+                    } else {
+                        // KiotProxy dynamic
+                        await bot.editMessageText(`⏳ Đang kết nối KiotProxy...`, { chat_id: chatId, message_id: processingMsg.message_id });
+                        try {
+                            currentProxy = await getKiotProxy(currentKiotKey, 'random');
+                        } catch (err) {
+                            bot.sendMessage(chatId, `⚠️ Lỗi lấy Proxy: ${err.message}. Thử tải bằng IP gốc.`);
+                        }
                     }
                 }
 
