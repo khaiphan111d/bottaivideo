@@ -22,10 +22,14 @@ if (telegramToken) {
 
     bot.setMyCommands([
         {command: 'start', description: 'Bắt đầu sử dụng bot'},
-        {command: 'hd', description: 'Xem hướng dẫn chi tiết'},
+        {command: 'hd', description: 'Xem hướng dẫn tổng quan'},
+        {command: 'hdcookie', description: '📖 Hướng dẫn cách lấy Cookie vượt chặn'},
+        {command: 'setcookie', description: 'Thiết lập Cookie tài khoản (Bypass 403 & Full video)'},
+        {command: 'getcookie', description: 'Kiểm tra trạng thái Cookie hiện tại'},
+        {command: 'clearcookie', description: 'Xoá Cookie đã lưu'},
         {command: 'checkip', description: 'Kiểm tra IP Proxy đang kết nối'},
         {command: 'newip', description: 'Đổi sang Proxy mới ngay lập tức'},
-        {command: 'setproxy', description: 'Thiết lập Key KiotProxy'},
+        {command: 'setproxy', description: 'Thiết lập Key KiotProxy / Proxy302'},
         {command: 'adduser', description: 'Thêm ID được dùng Bot'},
         {command: 'deluser', description: 'Xóa ID khỏi danh sách'},
         {command: 'listuser', description: 'Xem danh sách người dùng'}
@@ -45,6 +49,22 @@ if (telegramToken) {
             console.error("Lỗi lấy kiotproxy key từ DB:", e);
         }
         return process.env.KIOTPROXY_KEY || config.kiotproxyKey;
+    }
+
+    async function getGlobalCookie() {
+        try {
+            const { rows } = await db.query("SELECT value FROM system_config WHERE key = 'hongguo_cookie'");
+            if (rows.length > 0 && rows[0].value) {
+                let val = rows[0].value;
+                if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
+                    val = JSON.parse(val);
+                }
+                return val;
+            }
+        } catch (e) {
+            console.error("Lỗi lấy Cookie từ DB:", e.message);
+        }
+        return config.hongguoCookie || "";
     }
 
     bot.on('message', async (msg) => {
@@ -78,36 +98,66 @@ if (telegramToken) {
         }
 
         if (text === '/start') {
-            bot.sendMessage(chatId, "Xin chào! Hãy gửi cho tôi link video, tôi sẽ tải và gửi lại cho bạn.\nNếu bạn bị chặn IP, hãy gửi lệnh `/setproxy [KEY]` để thiết lập KiotProxy.\nGõ `/hd` để xem hướng dẫn chi tiết.", {parse_mode: 'Markdown'});
+            bot.sendMessage(chatId, "Xin chào! Hãy gửi cho tôi link video, tôi sẽ tải và gửi lại cho bạn.\nNếu bạn bị chặn IP hoặc cắt 30s, hãy gửi `/setcookie [COOKIE]` hoặc dùng Proxy.\nGõ `/hd` để xem hướng dẫn chung hoặc `/hdcookie` để xem cách lấy Cookie.", {parse_mode: 'Markdown'});
             return;
         }
 
         if (text === '/hd') {
             const helpText = `
-📖 **HƯỚNG DẪN SỬ DỤNG BOT TẢI VIDEO**
+📖 **HƯỚNG DẪN SỬ DỤNG BOT TẢI FULL VIDEO**
 
 **1. CÁCH TẢI VIDEO:**
-🔸 Copy link video và dán thẳng vào đây.
-🔸 Bot sẽ tự động bắt link, tải video và gửi lại cho bạn.
-*(Lưu ý: Giới hạn file video Telegram là 50MB)*
+🔸 Copy link video (Hồng Quả, Douyin, Kuaishou,...) và dán thẳng vào đây.
+🔸 Bot mặc định sử dụng **Cách 3 (App Native API)** để lấy Full Video không cắt 30s.
 
-**2. CÁCH DÙNG PROXY (KIOTPROXY):**
+**2. PHÒNG KHI BỊ CHẶN / TẬP VIP (CÁCH 4 - DÙNG COOKIE):**
+🔸 Gõ \`/hdcookie\` để xem hướng dẫn từng bước cách lấy chuỗi Cookie.
+🔸 Lệnh lưu Cookie: \`/setcookie [CHUỖI_COOKIE]\`
+🔸 Lệnh kiểm tra: \`/getcookie\`
+🔸 Lệnh xoá: \`/clearcookie\`
+
+**3. CÁCH DÙNG PROXY (KIOTPROXY / PROXY302):**
 🔸 Lệnh đổi Key: \`/setproxy MÃ_KEY_CỦA_BẠN\`
-🔸 Lệnh kiểm tra IP: \`/checkip\` - Xem Bot đang dùng IP nào để tải.
-
-**3. DANH SÁCH TỔNG HỢP LỆNH:**
-🔹 \`/start\` - Khởi động lại Bot
-🔹 \`/hd\` - Mở bảng hướng dẫn
-🔹 \`/checkip\` - Kiểm tra mạng/IP hiện tại
-🔹 \`/newip\` - Ép hệ thống đổi sang IP mới
-🔹 \`/setproxy [KEY]\` - Nhập Key KiotProxy
+🔸 Lệnh kiểm tra IP: \`/checkip\`
+🔸 Lệnh đổi IP mới: \`/newip\`
 
 **4. QUẢN LÝ NGƯỜI DÙNG (CHỈ ADMIN):**
 🔹 \`/adduser [ID]\` - Cấp quyền cho người khác.
-🔹 \`/deluser [ID]\` - Thu hồi quyền của một người.
+🔹 \`/deluser [ID]\` - Thu hồi quyền.
 🔹 \`/listuser\` - Xem danh sách người dùng được phép.
 `;
             bot.sendMessage(chatId, helpText, {parse_mode: 'Markdown'});
+            return;
+        }
+
+        if (text === '/hdcookie') {
+            const cookieGuide = `
+🍪 **HƯỚNG DẪN LẤY & CÀI ĐẶT COOKIE (CÁCH 4)**
+_(Dùng khi Cách 3 bị lỗi, phim yêu cầu VIP, hoặc CDN chặn 403)_
+
+━━━━━━━━━━━━━━━━━━━━
+**📌 BƯỚC 1: LẤY COOKIE TỪ TRÌNH DUYỆT (CHROME/EDGE/CỐC CỐC)**
+1. Mở máy tính, vào trang web: \`https://novelquickapp.com\` (hoặc mở 1 link video Hồng Quả).
+2. Nhấn phím **F12** trên bàn phím (hoặc chuột phải chọn *Kiểm tra / Inspect*).
+3. Chọn thẻ **Network (Mạng)** ở thanh trên cùng.
+4. Nhấn phím **F5** để tải lại trang web.
+5. Click vào dòng đầu tiên (dòng \`novelquickapp.com\` hoặc \`detail\`).
+6. Ở khung bên phải, chọn thẻ **Headers** ➔ Cuộn xuống tìm mục **Request Headers** ➔ Tìm dòng **\`Cookie:\`**.
+7. Bôi đen và **Copy toàn bộ chuỗi ký tự** phía sau chữ \`Cookie:\` (thường bắt đầu bằng \`ttwid=...\` hoặc \`sessionid=...\`).
+
+━━━━━━━━━━━━━━━━━━━━
+**📌 BƯỚC 2: NẠP COOKIE VÀO BOT**
+Gửi tin nhắn vào Bot theo cú pháp:
+👉 \`/setcookie [DÁN_CHUỖI_COOKIE_VÀO_ĐÂY]\`
+
+*(Ví dụ: \`/setcookie ttwid=1%7C...; passport_csrf_token=...;\`)*
+
+━━━━━━━━━━━━━━━━━━━━
+**📌 BƯỚC 3: KIỂM TRA LẠI**
+🔹 Gõ \`/getcookie\` để kiểm tra Bot đã nhận Cookie chưa.
+🔹 Sau khi cài xong, bạn chỉ việc gửi lại link video để Bot tải Full Video bình thường!
+`;
+            bot.sendMessage(chatId, cookieGuide, {parse_mode: 'Markdown'});
             return;
         }
 
@@ -186,9 +236,6 @@ if (telegramToken) {
                 return;
             }
             const newKey = text.replace('/setproxy ', '').trim();
-            // Hỗ trợ 2 format:
-            //   KiotProxy  : chuỗi key bắt đầu bằng chữ K (vd: K79b98924b07...)
-            //   Proxy302   : host:port:user:pass (4 phần)
             const parts = newKey.split(':');
             const isStaticProxy = parts.length === 4;
             try {
@@ -198,6 +245,54 @@ if (telegramToken) {
                 } else {
                     bot.sendMessage(chatId, `✅ Đã lưu **KiotProxy Key** thành công vào Database!`);
                 }
+            } catch (err) {
+                bot.sendMessage(chatId, "❌ Lỗi DB: " + err.message);
+            }
+            return;
+        }
+
+        if (text.startsWith('/setcookie ')) {
+            if (String(chatId) !== MASTER_ADMIN_ID && role !== 'admin') {
+                bot.sendMessage(chatId, "⛔ Chỉ Admin mới được phép sử dụng lệnh này.");
+                return;
+            }
+            const newCookie = text.replace('/setcookie ', '').trim();
+            if (!newCookie) {
+                bot.sendMessage(chatId, "⚠️ Vui lòng nhập chuỗi Cookie hợp lệ.");
+                return;
+            }
+            try {
+                await db.query("INSERT INTO system_config (key, value) VALUES ('hongguo_cookie', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [JSON.stringify(newCookie)]);
+                bot.sendMessage(chatId, `✅ **Đã lưu Cookie Hồng Quả thành công!**\n🔑 Độ dài: ${newCookie.length} ký tự.\nTừ bây giờ Bot sẽ đính kèm Cookie này để mở khoá Full Video và vượt qua kiểm tra IP/WAF.`, { parse_mode: 'Markdown' });
+            } catch (err) {
+                bot.sendMessage(chatId, "❌ Lỗi DB: " + err.message);
+            }
+            return;
+        }
+
+        if (text === '/getcookie') {
+            if (String(chatId) !== MASTER_ADMIN_ID && role !== 'admin') {
+                bot.sendMessage(chatId, "⛔ Chỉ Admin mới được phép sử dụng lệnh này.");
+                return;
+            }
+            const activeCookie = await getGlobalCookie();
+            if (activeCookie) {
+                const preview = activeCookie.length > 60 ? activeCookie.substring(0, 60) + '...' : activeCookie;
+                bot.sendMessage(chatId, `🔑 **TRẠNG THÁI COOKIE:** Đang kích hoạt\n📝 **Xem trước:** \`${preview}\`\n📏 **Độ dài:** ${activeCookie.length} ký tự`, { parse_mode: 'Markdown' });
+            } else {
+                bot.sendMessage(chatId, `⚠️ Hiện tại chưa có Cookie nào được thiết lập.\n👉 Gõ \`/setcookie [CHUỖI_COOKIE]\` để thiết lập.`, { parse_mode: 'Markdown' });
+            }
+            return;
+        }
+
+        if (text === '/clearcookie') {
+            if (String(chatId) !== MASTER_ADMIN_ID && role !== 'admin') {
+                bot.sendMessage(chatId, "⛔ Chỉ Admin mới được phép sử dụng lệnh này.");
+                return;
+            }
+            try {
+                await db.query("DELETE FROM system_config WHERE key = 'hongguo_cookie'");
+                bot.sendMessage(chatId, `🗑 **Đã xoá Cookie thành công!** Hệ thống sẽ chuyển về chế độ mặc định.`);
             } catch (err) {
                 bot.sendMessage(chatId, "❌ Lỗi DB: " + err.message);
             }
@@ -311,7 +406,8 @@ if (telegramToken) {
                     }
                 }
 
-                const videoInfo = await parseVideoUrl(url, proxyUrl);
+                const currentCookie = await getGlobalCookie();
+                const videoInfo = await parseVideoUrl(url, proxyUrl, currentCookie);
 
                 if (videoInfo && videoInfo.url) {
                     await bot.editMessageText(`⏳ Đang tải video: ${videoInfo.title}...`, { chat_id: chatId, message_id: processingMsg.message_id });
@@ -325,18 +421,27 @@ if (telegramToken) {
                     console.log(`[INFO] Dung lượng file đã tải: ${fileSizeMB.toFixed(1)}MB`);
 
                     try {
+                        let methodNote = "";
+                        if (videoInfo.source === 'app_native_api') {
+                            methodNote = "⚡ *Cơ chế:* Native App API (Full HD)\n";
+                        } else if (currentCookie) {
+                            methodNote = "🔑 *Cơ chế:* Cookie VIP Bypass\n";
+                        }
+
                         let finalCaption = `🎬 **${videoInfo.title}**\n\n`;
-                        finalCaption += currentProxy ? `🛡 *Đã tải ẩn danh*\n🌐 **IP Kết Nối:** \`${currentProxy.ip}\`` : `⚠️ *Tải bằng IP gốc*`;
+                        finalCaption += methodNote;
+                        finalCaption += currentProxy ? `🛡 *Kết nối Proxy:* \`${currentProxy.ip}\`` : `⚠️ *Tải bằng IP gốc*`;
 
                         if (fileSizeMB > 49.5) {
                             await bot.editMessageText(`⏳ Dung lượng video lớn (${fileSizeMB.toFixed(1)}MB). Đang upload lên web để lấy link tải...`, { chat_id: chatId, message_id: processingMsg.message_id });
                             const uploadLink = await uploadToThirdParty(videoPath);
                             
                             let webCaption = `🎬 **${videoInfo.title}**\n\n`;
+                            webCaption += methodNote;
                             webCaption += `⚠️ *Video quá lớn để gửi trực tiếp \(>50MB\)\.*\n`;
                             webCaption += `👉 [BẤM VÀO ĐÂY ĐỂ TẢI VIDEO VỀ](${uploadLink})\n`;
                             webCaption += `_\(Link tải tự động xóa sau 12 giờ\)_\n\n`;
-                            webCaption += currentProxy ? `🛡 *Đã tải ẩn danh*\n🌐 **IP Kết Nối:** \`${currentProxy.ip}\`` : `⚠️ *Tải bằng IP gốc*`;
+                            webCaption += currentProxy ? `🛡 *Kết nối Proxy:* \`${currentProxy.ip}\`` : `⚠️ *Tải bằng IP gốc*`;
                             
                             await bot.sendMessage(chatId, webCaption, { parse_mode: 'Markdown', disable_web_page_preview: true });
                             bot.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
@@ -368,7 +473,11 @@ if (telegramToken) {
                     bot.sendMessage(chatId, "❌ Không tìm thấy link video gốc.");
                 }
             } catch (error) {
-                bot.sendMessage(chatId, `❌ Lỗi: ${error.message}`);
+                let errHelp = `❌ **Lỗi:** ${error.message}`;
+                if (error.message && (error.message.includes('403') || error.message.includes('CHẶN') || error.message.includes('TỪ CHỐI') || error.message.includes('CAPTCHA'))) {
+                    errHelp += `\n\n💡 *Gợi ý khắc phục:* Nếu link bị chặn hoặc chỉ có bản 30s, bạn hãy gõ lệnh \`/hdcookie\` để xem cách nạp Cookie tài khoản thật vượt chặn 100%.`;
+                }
+                bot.sendMessage(chatId, errHelp, { parse_mode: 'Markdown' });
             }
         }
     });

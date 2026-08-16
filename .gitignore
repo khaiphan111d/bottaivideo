@@ -2,6 +2,7 @@ node_modules/
 downloads/
 hongguo-downloader/
 *.mp4
+*.html
 config.json
 databse
 tai lieu

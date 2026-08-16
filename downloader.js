@@ -5,6 +5,8 @@ const ffmpeg = require('fluent-ffmpeg');
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const FormData = require('form-data');
 
+const { getActiveCookie } = require('./parser');
+
 /**
  * Tải video MP4 hoặc M3U8 từ URL
  * @param {string} videoUrl URL của video (.mp4 hoặc .m3u8)
@@ -13,9 +15,7 @@ const FormData = require('form-data');
  * @returns {Promise<void>}
  */
 async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
-    // Lưu video trực tiếp tại thư mục hiện tại
     const downloadsDir = __dirname;
-
     const outputPath = path.join(downloadsDir, `${outputFilename}.mp4`);
 
     if (videoUrl.includes('.m3u8')) {
@@ -23,7 +23,6 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
         return new Promise((resolve, reject) => {
             let command = ffmpeg(videoUrl);
 
-            // Thêm proxy cho FFmpeg nếu có
             if (proxyUrl) {
                 command = command.addInputOption(`-http_proxy ${proxyUrl}`);
             }
@@ -43,56 +42,80 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
                 .run();
         });
     } else {
-        console.log(`[INFO] Phát hiện định dạng MP4. Đang tải file...`);
-        try {
-            const isHongguoCDN = videoUrl.includes('qznovel.com');
-            let axiosConfig = {
-                method: 'GET',
-                url: videoUrl,
-                responseType: 'stream',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    ...(isHongguoCDN && {
-                        'Referer': 'https://novelquickapp.com/',
-                        'Origin': 'https://novelquickapp.com',
-                        'Accept': 'video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8'
-                    })
-                }
-            };
+        console.log(`[INFO] Phát hiện định dạng MP4. Đang kết nối luồng tải...`);
+        
+        const cookie = getActiveCookie();
+        const isHongguoCDN = videoUrl.includes('qznovel.com') || videoUrl.includes('bytevd.com') || videoUrl.includes('douyinvod.com');
 
-            if (proxyUrl) {
-                axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
-            }
-
-            const response = await axios(axiosConfig);
-
-            const writer = fs.createWriteStream(outputPath);
-            response.data.pipe(writer);
-
-            return new Promise((resolve, reject) => {
-                writer.on('finish', () => {
-                    console.log(`[SUCCESS] Đã lưu video thành công tại: ${outputPath}`);
-                    resolve(outputPath);
-                });
-                writer.on('error', (err) => {
-                    console.error(`[ERROR] Lỗi khi lưu file:`, err.message);
-                    reject(err);
-                });
-            });
-        } catch (error) {
-            let errorMsg = error.message;
-            if (error.response) {
-                const status = error.response.status;
-                if ([403, 429, 401].includes(status)) {
-                    errorMsg = `🛑 LỖI TẢI VIDEO (Mã ${status}): Máy chủ video đã từ chối kết nối. Có thể IP của bạn đã bị chặn. Vui lòng đổi IP hoặc thử lại sau.`;
-                }
-            } else if (error.message && (error.message.toLowerCase().includes('timeout') || error.message.toLowerCase().includes('econnreset'))) {
-                errorMsg = `🛑 LỖI MẠNG: Kết nối bị ngắt, có thể IP bị chặn hoặc mạng quá yếu.`;
-            }
-
-            console.error(`[ERROR] Lỗi khi tải luồng MP4:`, errorMsg);
-            throw new Error(errorMsg);
+        // Danh sách URL thử nghiệm (Bao gồm CDN dự phòng nếu domain chính bị 403)
+        const tryUrls = [videoUrl];
+        if (videoUrl.includes('qznovel.com')) {
+            // Thử đổi sang CDN mirror ByteDance Douyin
+            tryUrls.push(videoUrl.replace('v3-share.qznovel.com', 'v3-novel.douyinvod.com'));
+            tryUrls.push(videoUrl.replace('v3-share.qznovel.com', 'v26-novel.douyinvod.com'));
         }
+
+        let lastError = null;
+
+        for (let i = 0; i < tryUrls.length; i++) {
+            const currentUrl = tryUrls[i];
+            try {
+                let axiosConfig = {
+                    method: 'GET',
+                    url: currentUrl,
+                    responseType: 'stream',
+                    timeout: 20000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Range': 'bytes=0-', // 🔑 Bắt buộc đối với CDN ByteDance/Hồng Quả để tránh bị bóp/ngắt luồng 403
+                        'Accept': 'video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8',
+                        'Accept-Encoding': 'identity;q=1, *;q=0',
+                        'Sec-Fetch-Dest': 'video',
+                        'Sec-Fetch-Mode': 'no-cors',
+                        'Sec-Fetch-Site': 'cross-site',
+                        ...(isHongguoCDN && {
+                            'Referer': 'https://novelquickapp.com/',
+                            'Origin': 'https://novelquickapp.com'
+                        }),
+                        ...(cookie ? { 'Cookie': cookie } : {})
+                    }
+                };
+
+                if (proxyUrl) {
+                    axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
+                }
+
+                const response = await axios(axiosConfig);
+
+                const writer = fs.createWriteStream(outputPath);
+                response.data.pipe(writer);
+
+                await new Promise((resolve, reject) => {
+                    writer.on('finish', resolve);
+                    writer.on('error', reject);
+                });
+
+                console.log(`[SUCCESS] Đã tải và lưu video thành công tại: ${outputPath}`);
+                return outputPath;
+            } catch (error) {
+                lastError = error;
+                console.log(`[WARN] Tải CDN lượt ${i + 1} không thành công (${error.message}), đang thử phương án tiếp...`);
+            }
+        }
+
+        // Nếu tất cả các URL CDN đều lỗi
+        let errorMsg = lastError ? lastError.message : "Không thể tải video từ máy chủ";
+        if (lastError && lastError.response) {
+            const status = lastError.response.status;
+            if ([403, 429, 401].includes(status)) {
+                errorMsg = `🛑 LỖI TẢI VIDEO (Mã ${status}): Máy chủ CDN từ chối kết nối. Hãy thử gán Cookie (/setcookie) hoặc đổi Proxy.`;
+            }
+        } else if (lastError && (lastError.message.toLowerCase().includes('timeout') || lastError.message.toLowerCase().includes('econnreset'))) {
+            errorMsg = `🛑 LỖI MẠNG: Kết nối tới CDN bị ngắt quãng, vui lòng thử lại.`;
+        }
+
+        console.error(`[ERROR] Thất bại khi tải luồng MP4:`, errorMsg);
+        throw new Error(errorMsg);
     }
 }
 
