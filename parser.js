@@ -297,6 +297,10 @@ async function parseVideoUrl(shareUrl, proxyUrl = null, customCookie = null) {
                 };
             }
 
+            if (html.includes('404 not found') || html.includes('This page could not be found')) {
+                throw new Error("⚠️ Link chia sẻ này đã hết hạn hoặc không tồn tại trên hệ thống Hồng Quả (404 Not Found). Bạn hãy vào App Hồng Quả bấm 'Chia sẻ' và sao chép lại link mới nhất nhé!");
+            }
+
             console.log("[WARN] Không tìm thấy dữ liệu video trong HTML Hồng Quả, chuyển sang API dự phòng...");
         }
 
@@ -309,31 +313,36 @@ async function parseVideoUrl(shareUrl, proxyUrl = null, customCookie = null) {
         const apiConfig = { ...axiosConfig };
         apiConfig.headers = { ...apiConfig.headers, ...config.headers };
 
-        if (config.method.toUpperCase() === 'POST') {
-            response = await axios.post(
-                config.apiEndpoint,
-                { url: extractedUrl },
-                apiConfig
-            );
-        } else {
-            apiConfig.params = { url: extractedUrl };
-            response = await axios.get(config.apiEndpoint, apiConfig);
-        }
-
-        const data = response.data;
-        if (data && (data.code === 200 || data.code === 0 || data.status === 'success')) {
-            const videoData = data.data || data;
-            let finalUrl = videoData.url || videoData.video || videoData.play_url || videoData.video_url;
-            if (finalUrl) {
-                finalUrl = finalUrl.replace(/&end=\d+/g, '').replace(/&start=\d+/g, '');
+        try {
+            if (config.method.toUpperCase() === 'POST') {
+                response = await axios.post(
+                    config.apiEndpoint,
+                    { url: extractedUrl },
+                    apiConfig
+                );
+            } else {
+                apiConfig.params = { url: extractedUrl };
+                response = await axios.get(config.apiEndpoint, apiConfig);
             }
-            return {
-                title: videoData.title || `video_${Date.now()}`,
-                url: finalUrl,
-                source: 'third_party_api'
-            };
-        } else {
-            throw new Error(data.msg || data.message || 'API trả về phản hồi không hợp lệ');
+
+            const data = response.data;
+            if (data && (data.code === 200 || data.code === 0 || data.status === 'success')) {
+                const videoData = data.data || data;
+                let finalUrl = videoData.url || videoData.video || videoData.play_url || videoData.video_url;
+                if (finalUrl) {
+                    finalUrl = finalUrl.replace(/&end=\d+/g, '').replace(/&start=\d+/g, '');
+                }
+                return {
+                    title: videoData.title || `video_${Date.now()}`,
+                    url: finalUrl,
+                    source: 'third_party_api'
+                };
+            } else {
+                throw new Error(data.msg || data.message || 'API trả về phản hồi không hợp lệ');
+            }
+        } catch (apiErr) {
+            console.log(`[WARN] API dự phòng thất bại: ${apiErr.message}`);
+            throw new Error(`Không thể phân tích video từ link này. Link có thể đã hết hạn hoặc máy chủ video đang bảo trì.`);
         }
     } catch (error) {
         let msg = error.response ? (error.response.data?.msg || error.message) : error.message;
@@ -342,6 +351,8 @@ async function parseVideoUrl(shareUrl, proxyUrl = null, customCookie = null) {
             const status = error.response.status;
             if ([403, 429, 401].includes(status)) {
                 msg = `🛑 IP/SESSION BỊ TỪ CHỐI (Mã ${status}): Web/CDN đã chặn kết nối. Hãy thử thêm Cookie (/setcookie) hoặc đổi Proxy.`;
+            } else if (status === 503 || status === 502) {
+                msg = `🛑 MÁY CHỦ BẬN (Mã ${status}): Máy chủ phân tích đang quá tải hoặc tạm thời không phản hồi.`;
             } else if (typeof error.response.data === 'string' && error.response.data.toLowerCase().includes('captcha')) {
                 msg = `🛑 YÊU CẦU CAPTCHA: Web bắt xác minh robot, cần cập nhật Cookie mới từ trình duyệt.`;
             }
