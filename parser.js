@@ -1,7 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const { HttpsProxyAgent } = require('https-proxy-agent');
+const { createProxyAgent } = require('./proxyHelper');
 
 const configPath = path.join(__dirname, 'config.json');
 let config = {
@@ -59,7 +59,11 @@ async function fetchHongguoAppApi(seriesId, itemId, cookie = null, proxyUrl = nu
         timeout: 12000
     };
     if (proxyUrl) {
-        axiosOptions.httpsAgent = new HttpsProxyAgent(proxyUrl);
+        const agent = createProxyAgent(proxyUrl);
+        if (agent) {
+            axiosOptions.httpAgent = agent;
+            axiosOptions.httpsAgent = agent;
+        }
     }
 
     // Các tham số giả lập Native App
@@ -140,7 +144,11 @@ async function parseVideoUrl(shareUrl, proxyUrl = null, customCookie = null) {
         };
 
         if (proxyUrl) {
-            axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
+            const agent = createProxyAgent(proxyUrl);
+            if (agent) {
+                axiosConfig.httpAgent = agent;
+                axiosConfig.httpsAgent = agent;
+            }
         }
 
         // Cải thiện regex để không lấy dấu phẩy hoặc ký tự tiếng Trung dính liền
@@ -159,7 +167,13 @@ async function parseVideoUrl(shareUrl, proxyUrl = null, customCookie = null) {
                 validateStatus: s => s < 400,
                 headers: baseHeaders
             };
-            if (proxyUrl) step1Config.httpsAgent = new HttpsProxyAgent(proxyUrl);
+            if (proxyUrl) {
+                const agent = createProxyAgent(proxyUrl);
+                if (agent) {
+                    step1Config.httpAgent = agent;
+                    step1Config.httpsAgent = agent;
+                }
+            }
 
             let targetUrl = extractedUrl;
             try {
@@ -190,7 +204,13 @@ async function parseVideoUrl(shareUrl, proxyUrl = null, customCookie = null) {
             const step2Config = {
                 headers: baseHeaders
             };
-            if (proxyUrl) step2Config.httpsAgent = new HttpsProxyAgent(proxyUrl);
+            if (proxyUrl) {
+                const agent = createProxyAgent(proxyUrl);
+                if (agent) {
+                    step2Config.httpAgent = agent;
+                    step2Config.httpsAgent = agent;
+                }
+            }
 
             const htmlRes = await axios.get(targetUrl, step2Config);
             let html = htmlRes.data;

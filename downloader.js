@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const ffmpeg = require('fluent-ffmpeg');
-const { HttpsProxyAgent } = require('https-proxy-agent');
+const { createProxyAgent } = require('./proxyHelper');
 const FormData = require('form-data');
 
 const { getActiveCookie } = require('./parser');
@@ -23,7 +23,7 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
         return new Promise((resolve, reject) => {
             let command = ffmpeg(videoUrl);
 
-            if (proxyUrl) {
+            if (proxyUrl && proxyUrl.startsWith('http')) {
                 command = command.addInputOption(`-http_proxy ${proxyUrl}`);
             }
 
@@ -82,7 +82,11 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
                 };
 
                 if (attempt.useProxy && proxyUrl) {
-                    axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
+                    const agent = createProxyAgent(proxyUrl);
+                    if (agent) {
+                        axiosConfig.httpAgent = agent;
+                        axiosConfig.httpsAgent = agent;
+                    }
                 }
 
                 const response = await axios(axiosConfig);
