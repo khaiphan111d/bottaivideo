@@ -378,7 +378,7 @@ Gửi tin nhắn vào Bot theo cú pháp:
         if (text === '/scanproxy' || text === '/refreshpool') {
             const checkMsg = await bot.sendMessage(chatId, "🔍 **Đang quét và kiểm tra (Health Check) các nguồn Proxy Trung Quốc...**\n_Vui lòng đợi trong giây lát..._", { parse_mode: 'Markdown' });
             try {
-                const pool = await refreshChinaProxyPool(true, 35);
+                const pool = await refreshChinaProxyPool(true, 100);
                 let report = `✅ **QUÉT PROXY TRUNG QUỐC HOÀN TẤT!**\n\n`;
                 report += `📊 **Tổng số Proxy sống:** \`${pool.length}\` IP\n`;
                 if (pool.length > 0) {

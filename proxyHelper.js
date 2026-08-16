@@ -204,7 +204,7 @@ async function fetchRawChinaProxies() {
  * @param {number} maxToTest - Số lượng tối đa cần kiểm tra
  * @returns {Promise<Array<{proxyUrl: string, ip: string, location: string, latencyMs: number}>>}
  */
-async function refreshChinaProxyPool(forceRefresh = false, maxToTest = 80) {
+async function refreshChinaProxyPool(forceRefresh = false, maxToTest = 120) {
     const now = Date.now();
     // Cache trong 10 phút nếu pool vẫn còn nhiều proxy sống
     if (!forceRefresh && activeChinaProxyPool.length >= 3 && (now - lastPoolRefreshTime) < 10 * 60 * 1000) {
@@ -229,7 +229,7 @@ async function refreshChinaProxyPool(forceRefresh = false, maxToTest = 80) {
         }).slice(0, maxToTest);
 
         const liveProxies = [];
-        const chunkSize = 20;
+        const chunkSize = 25;
 
         for (let i = 0; i < candidateList.length; i += chunkSize) {
             const chunk = candidateList.slice(i, i + chunkSize);
