@@ -44,9 +44,9 @@ function getActiveCookie(customCookie = null) {
 async function fetchHongguoAppApi(seriesId, itemId, cookie = null, proxyUrl = null) {
     console.log(`[CÁCH 3 - APP API] Đang gọi Native App API với series_id=${seriesId}, item_id=${itemId}...`);
     
-    // Header chuẩn của ứng dụng di động Hồng Quả (Android App)
+    // Header chuẩn của ứng dụng di động Hồng Quả (Android App) v7.3.2
     const appHeaders = {
-        'User-Agent': 'com.dragon.read/6.2.0 (Linux; U; Android 14; vi_VN; SM-S918B; Build/UP1A.231005.007; Cronet/TTNetVersion:f931d8e1 2024-04-10 QuicVersion:46900f68 2024-03-05)',
+        'User-Agent': 'com.dragon.read/7.3.2 (Linux; U; Android 14; vi_VN; SM-S918B; Build/UP1A.231005.007; Cronet/TTNetVersion:f931d8e1 2024-04-10 QuicVersion:46900f68 2024-03-05)',
         'Accept-Encoding': 'gzip, deflate',
         'sdk-version': '2',
         'passport-sdk-version': '20',
@@ -56,7 +56,8 @@ async function fetchHongguoAppApi(seriesId, itemId, cookie = null, proxyUrl = nu
 
     const axiosOptions = {
         headers: appHeaders,
-        timeout: 12000
+        timeout: 12000,
+        signal: AbortSignal.timeout(12000)
     };
     if (proxyUrl) {
         const agent = createProxyAgent(proxyUrl);
@@ -66,49 +67,52 @@ async function fetchHongguoAppApi(seriesId, itemId, cookie = null, proxyUrl = nu
         }
     }
 
-    // Các tham số giả lập Native App
-    const params = {
-        aid: '2329', // App ID của Hồng Quả / Cà Chua Kịch Ngắn
-        app_name: 'novelapp',
-        version_code: '620',
-        version_name: '6.2.0',
-        device_platform: 'android',
-        os_version: '14',
-        series_id: seriesId,
-        item_id: itemId || '',
-        channel: 'tengxun',
-        device_type: 'SM-S918B'
-    };
+    // Thử cả 2 aid: 8662 (Hồng Quả Đoản Kịch) và 2329 (Phiên Gia / Cà Chua)
+    const aidList = ['8662', '2329'];
 
-    // Danh sách các endpoint API nội bộ của App
-    const endpoints = [
-        `https://api5-normal-c-hl.fqnovel.com/api/drama/v1/detail/`,
-        `https://novelquickapp.com/api/drama/v1/detail/`,
-        `https://api3-normal-c-hl.fqnovel.com/drama/api/v1/series/detail/`
+    // Danh sách các endpoint API nội bộ của App (domain nội địa TQ, cần proxy SOCKS5 để resolve DNS)
+    const endpointTemplates = [
+        'https://api5-normal-c-hl.fqnovel.com/api/drama/v1/detail/',
+        'https://api3-normal-c-hl.fqnovel.com/api/drama/v1/detail/',
+        'http://api5-normal-c-hl.fqnovel.com/api/drama/v1/detail/',
+        'https://reading.snssdk.com/api/drama/v1/detail/',
     ];
 
-    for (const endpoint of endpoints) {
-        try {
-            const res = await axios.get(endpoint, { ...axiosOptions, params });
-            if (res.data && (res.data.code === 0 || res.data.status_code === 0 || res.data.data)) {
-                const data = res.data.data || res.data;
-                const playUrl = data.play_url || data.video_url || data.stream_url || (data.video_list && data.video_list[0]?.play_url);
-                const title = data.title || data.series_title || `hongguo_app_${Date.now()}`;
-                
-                if (playUrl) {
-                    // Làm sạch URL: loại bỏ giới hạn thời lượng 30s
-                    const cleanUrl = playUrl.replace(/&end=\d+/g, '').replace(/&start=\d+/g, '');
-                    console.log(`[CÁCH 3 - APP API] ✅ Lấy thành công video qua App API: ${title}`);
-                    return {
-                        title: title,
-                        url: cleanUrl,
-                        source: 'app_native_api'
-                    };
+    for (const aid of aidList) {
+        const params = {
+            aid: aid,
+            app_name: 'novelapp',
+            version_code: '732',
+            version_name: '7.3.2',
+            device_platform: 'android',
+            os_version: '14',
+            series_id: seriesId || '',
+            item_id: itemId || '',
+            channel: 'tengxun',
+            device_type: 'SM-S918B'
+        };
+
+        for (const endpoint of endpointTemplates) {
+            try {
+                const res = await axios.get(endpoint, { ...axiosOptions, params });
+                if (res.data && (res.data.code === 0 || res.data.status_code === 0 || res.data.data)) {
+                    const data = res.data.data || res.data;
+                    const playUrl = data.play_url || data.video_url || data.stream_url || (data.video_list && data.video_list[0]?.play_url);
+                    const title = data.title || data.series_title || `hongguo_app_${Date.now()}`;
+                    
+                    if (playUrl) {
+                        const cleanUrl = playUrl.replace(/&end=\d+/g, '').replace(/&start=\d+/g, '');
+                        console.log(`[CÁCH 3 - APP API] ✅ Lấy thành công video qua App API (aid=${aid}): ${title}`);
+                        return {
+                            title: title,
+                            url: cleanUrl,
+                            source: 'app_native_api'
+                        };
+                    }
                 }
+            } catch (e) {
+                console.log(`[CÁCH 3 - APP API] Endpoint ${endpoint} (aid=${aid}) thất bại: ${e.code || e.message}`);
             }
-        } catch (e) {
-            // Thử endpoint tiếp theo
-            console.log(`[CÁCH 3 - APP API] Endpoint ${endpoint} thất bại: ${e.message}`);
         }
     }
     return null;
@@ -186,13 +190,41 @@ async function parseVideoUrl(shareUrl, proxyUrl = null, customCookie = null) {
                 console.log("[WARN] Không lấy được redirect, dùng URL gốc:", redirectErr.message);
             }
 
-            // ── BƯỚC 2: Cố gắng trích xuất series_id và item_id từ URL để dùng CÁCH 3 (App API) ──
-            const seriesMatch = targetUrl.match(/series_id=([0-9]+)/) || targetUrl.match(/\/series\/([0-9]+)/);
-            const itemMatch = targetUrl.match(/item_id=([0-9]+)/) || targetUrl.match(/vid=([0-9]+)/) || targetUrl.match(/\/item\/([0-9]+)/);
+            // ── BƯỚC 2: Trích xuất series_id, item_id, vid, video_id từ URL ──
+            let seriesId = '';
+            let itemId = '';
 
-            if (seriesMatch && seriesMatch[1]) {
-                const seriesId = seriesMatch[1];
-                const itemId = itemMatch ? itemMatch[1] : '';
+            // Trường hợp 1: Link dạng video-animation-share chứa schemeParams (Mạn kịch / 漫剧)
+            if (targetUrl.includes('video-animation-share') || targetUrl.includes('schemeParams')) {
+                console.log('[INFO] Phát hiện link Mạn Kịch (video-animation-share), đang giải mã schemeParams...');
+                try {
+                    const zlinkMatch = targetUrl.match(/zlink=([^&]+)/);
+                    if (zlinkMatch) {
+                        const zlinkDecoded = decodeURIComponent(zlinkMatch[1]);
+                        const spMatch = zlinkDecoded.match(/schemeParams=([^&]+)/);
+                        if (spMatch) {
+                            const schemeParams = JSON.parse(decodeURIComponent(spMatch[1]));
+                            console.log('[INFO] schemeParams:', JSON.stringify(schemeParams));
+                            itemId = schemeParams.vid || schemeParams.share_toast_vid || '';
+                            seriesId = schemeParams.video_series_id || schemeParams.video_id || '';
+                        }
+                    }
+                } catch (spErr) {
+                    console.log('[WARN] Lỗi giải mã schemeParams:', spErr.message);
+                }
+            }
+
+            // Trường hợp 2: Link dạng drama-share thông thường (Phim ngắn / 短剧)
+            if (!seriesId && !itemId) {
+                const seriesMatch = targetUrl.match(/series_id=([0-9]+)/) || targetUrl.match(/\/series\/([0-9]+)/);
+                const itemMatch = targetUrl.match(/item_id=([0-9]+)/) || targetUrl.match(/vid=([0-9]+)/) || targetUrl.match(/\/item\/([0-9]+)/);
+                seriesId = seriesMatch ? seriesMatch[1] : '';
+                itemId = itemMatch ? itemMatch[1] : '';
+            }
+
+            // Gọi App API nếu có bất kỳ ID nào
+            if (seriesId || itemId) {
+                console.log(`[INFO] Extracted IDs: series_id=${seriesId}, item_id=${itemId}`);
                 const appResult = await fetchHongguoAppApi(seriesId, itemId, cookie, proxyUrl);
                 if (appResult && appResult.url) {
                     return appResult;
