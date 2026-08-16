@@ -1,3 +1,4 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 let TelegramBot = require('node-telegram-bot-api');
 if (typeof TelegramBot !== 'function') {
     TelegramBot = TelegramBot.default || TelegramBot.TelegramBot;

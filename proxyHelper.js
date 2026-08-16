@@ -3,9 +3,12 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const db = require('./db');
 
+// Tắt kiểm tra chặt chẽ chứng chỉ SSL đối với các Proxy trung gian
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 // Bắt và bỏ qua các lỗi ECONNRESET do socket proxy chết ngắt kết nối ngầm
 process.on('uncaughtException', (err) => {
-    if (err && (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED' || err.code === 'EHOSTUNREACH' || err.message?.includes('socket') || err.message?.includes('Client network'))) {
+    if (err && (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED' || err.code === 'EHOSTUNREACH' || err.message?.includes('socket') || err.message?.includes('Client network') || err.message?.includes('certificate'))) {
         return; // Bỏ qua lỗi ngắt kết nối proxy socket
     }
     console.error('[UNCAUGHT ERROR]', err);
@@ -26,9 +29,9 @@ function createProxyAgent(proxyUrl) {
     if (!proxyUrl) return null;
     try {
         if (proxyUrl.startsWith('socks4') || proxyUrl.startsWith('socks5')) {
-            return new SocksProxyAgent(proxyUrl);
+            return new SocksProxyAgent(proxyUrl, { rejectUnauthorized: false });
         }
-        return new HttpsProxyAgent(proxyUrl);
+        return new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: false });
     } catch (e) {
         console.error(`[ERROR] Không thể tạo Proxy Agent cho ${proxyUrl}:`, e.message);
         return null;
