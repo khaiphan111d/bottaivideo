@@ -23,13 +23,14 @@ if (telegramToken) {
     bot.setMyCommands([
         {command: 'start', description: 'Bắt đầu sử dụng bot'},
         {command: 'hd', description: 'Xem hướng dẫn tổng quan'},
-        {command: 'hdcookie', description: '📖 Hướng dẫn cách lấy Cookie vượt chặn'},
-        {command: 'setcookie', description: 'Thiết lập Cookie tài khoản (Bypass 403 & Full video)'},
-        {command: 'getcookie', description: 'Kiểm tra trạng thái Cookie hiện tại'},
-        {command: 'clearcookie', description: 'Xoá Cookie đã lưu'},
+        {command: 'hdproxy', description: '🌐 Hướng dẫn cách lấy Key Proxy (KiotProxy / Proxy302)'},
+        {command: 'hdcookie', description: '🍪 Hướng dẫn cách lấy Cookie vượt chặn'},
+        {command: 'setproxy', description: 'Thiết lập Key KiotProxy / Proxy302'},
         {command: 'checkip', description: 'Kiểm tra IP Proxy đang kết nối'},
         {command: 'newip', description: 'Đổi sang Proxy mới ngay lập tức'},
-        {command: 'setproxy', description: 'Thiết lập Key KiotProxy / Proxy302'},
+        {command: 'setcookie', description: 'Thiết lập Cookie tài khoản'},
+        {command: 'getcookie', description: 'Kiểm tra trạng thái Cookie hiện tại'},
+        {command: 'clearcookie', description: 'Xoá Cookie đã lưu'},
         {command: 'adduser', description: 'Thêm ID được dùng Bot'},
         {command: 'deluser', description: 'Xóa ID khỏi danh sách'},
         {command: 'listuser', description: 'Xem danh sách người dùng'}
@@ -98,7 +99,7 @@ if (telegramToken) {
         }
 
         if (text === '/start') {
-            bot.sendMessage(chatId, "Xin chào! Hãy gửi cho tôi link video, tôi sẽ tải và gửi lại cho bạn.\nNếu bạn bị chặn IP hoặc cắt 30s, hãy gửi `/setcookie [COOKIE]` hoặc dùng Proxy.\nGõ `/hd` để xem hướng dẫn chung hoặc `/hdcookie` để xem cách lấy Cookie.", {parse_mode: 'Markdown'});
+            bot.sendMessage(chatId, "Xin chào! Hãy gửi cho tôi link video, tôi sẽ tải và gửi lại cho bạn.\n\n📖 Gõ `/hd` để xem hướng dẫn tổng quan.\n🌐 Gõ `/hdproxy` để xem cách lấy Key Proxy Việt Nam / Proxy302.\n🍪 Gõ `/hdcookie` để xem cách lấy Cookie vượt chặn.", {parse_mode: 'Markdown'});
             return;
         }
 
@@ -110,16 +111,17 @@ if (telegramToken) {
 🔸 Copy link video (Hồng Quả, Douyin, Kuaishou,...) và dán thẳng vào đây.
 🔸 Bot mặc định sử dụng **Cách 3 (App Native API)** để lấy Full Video không cắt 30s.
 
-**2. PHÒNG KHI BỊ CHẶN / TẬP VIP (CÁCH 4 - DÙNG COOKIE):**
+**2. CÁCH DÙNG PROXY (KIOTPROXY / PROXY302):**
+🔸 Gõ \`/hdproxy\` để xem hướng dẫn chi tiết cách lấy Key Proxy.
+🔸 Lệnh đổi Key: \`/setproxy MÃ_KEY_CỦA_BẠN\`
+🔸 Lệnh kiểm tra IP: \`/checkip\`
+🔸 Lệnh đổi IP mới: \`/newip\`
+
+**3. PHÒNG KHI BỊ CHẶN / TẬP VIP (DÙNG COOKIE):**
 🔸 Gõ \`/hdcookie\` để xem hướng dẫn từng bước cách lấy chuỗi Cookie.
 🔸 Lệnh lưu Cookie: \`/setcookie [CHUỖI_COOKIE]\`
 🔸 Lệnh kiểm tra: \`/getcookie\`
 🔸 Lệnh xoá: \`/clearcookie\`
-
-**3. CÁCH DÙNG PROXY (KIOTPROXY / PROXY302):**
-🔸 Lệnh đổi Key: \`/setproxy MÃ_KEY_CỦA_BẠN\`
-🔸 Lệnh kiểm tra IP: \`/checkip\`
-🔸 Lệnh đổi IP mới: \`/newip\`
 
 **4. QUẢN LÝ NGƯỜI DÙNG (CHỈ ADMIN):**
 🔹 \`/adduser [ID]\` - Cấp quyền cho người khác.
@@ -127,6 +129,38 @@ if (telegramToken) {
 🔹 \`/listuser\` - Xem danh sách người dùng được phép.
 `;
             bot.sendMessage(chatId, helpText, {parse_mode: 'Markdown'});
+            return;
+        }
+
+        if (text === '/hdproxy') {
+            const proxyGuide = `
+🌐 **HƯỚNG DẪN LẤY & CÀI ĐẶT KEY PROXY**
+
+Bot hỗ trợ 2 loại Proxy thông dụng:
+
+━━━━━━━━━━━━━━━━━━━━
+**1️⃣ CÁCH LẤY KEY KIOTPROXY (PROXY DÂN CƯ VIỆT NAM):**
+1. Truy cập trang web: \`https://kiotproxy.com\`
+2. Đăng ký tài khoản và đăng nhập.
+3. Chọn mục **Quản lý Proxy** ➔ Chọn mua gói **Proxy Xoay (Dynamic Proxy)**.
+4. Sao chép chuỗi **API Key** của bạn (chuỗi bắt đầu bằng chữ \`K\`, ví dụ: \`K79b98924b07141a1849720440b5b8080\`).
+5. Gửi vào Bot cú pháp:
+   👉 \`/setproxy K79b98924b07141a1849720440b5b8080\`
+
+━━━━━━━━━━━━━━━━━━━━
+**2️⃣ CÁCH LẤY PROXY302 (PROXY TĨNH / STATIC PROXY):**
+1. Truy cập trang: \`https://proxy302.com\`
+2. Mua Proxy Tĩnh (chọn quốc gia Việt Nam hoặc Trung Quốc).
+3. Lấy định dạng: \`host:port:username:password\`
+4. Gửi vào Bot cú pháp:
+   👉 \`/setproxy 103.153.64.21:8080:user123:pass456\`
+
+━━━━━━━━━━━━━━━━━━━━
+**3️⃣ CÁC LỆNH KIỂM TRA & SỬ DỤNG:**
+🔹 \`/checkip\` : Xem Bot đang kết nối qua IP nào.
+🔹 \`/newip\` : Yêu cầu hệ thống đổi sang một IP Proxy mới.
+`;
+            bot.sendMessage(chatId, proxyGuide, {parse_mode: 'Markdown'});
             return;
         }
 
