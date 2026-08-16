@@ -64,7 +64,7 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
                     method: 'GET',
                     url: videoUrl,
                     responseType: 'stream',
-                    timeout: 25000,
+                    timeout: 60000,
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Range': 'bytes=0-', // 🔑 Bắt buộc đối với CDN ByteDance/Hồng Quả để tránh bị bóp/ngắt luồng
