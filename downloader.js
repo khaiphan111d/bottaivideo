@@ -47,27 +47,27 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
         const cookie = getActiveCookie();
         const isHongguoCDN = videoUrl.includes('qznovel.com') || videoUrl.includes('bytevd.com') || videoUrl.includes('douyinvod.com');
 
-        // Danh sách URL thử nghiệm (Bao gồm CDN dự phòng nếu domain chính bị 403)
-        const tryUrls = [videoUrl];
-        if (videoUrl.includes('qznovel.com')) {
-            // Thử đổi sang CDN mirror ByteDance Douyin
-            tryUrls.push(videoUrl.replace('v3-share.qznovel.com', 'v3-novel.douyinvod.com'));
-            tryUrls.push(videoUrl.replace('v3-share.qznovel.com', 'v26-novel.douyinvod.com'));
+        // Các cấu hình thử nghiệm: Thử qua Proxy trước (nếu có), nếu proxy 502/lỗi thì tự thử lại bằng IP gốc
+        const attempts = [];
+        if (proxyUrl) {
+            attempts.push({ useProxy: true, desc: 'Qua Proxy' });
+            attempts.push({ useProxy: false, desc: 'Qua IP gốc' });
+        } else {
+            attempts.push({ useProxy: false, desc: 'Qua IP gốc' });
         }
 
         let lastError = null;
 
-        for (let i = 0; i < tryUrls.length; i++) {
-            const currentUrl = tryUrls[i];
+        for (const attempt of attempts) {
             try {
                 let axiosConfig = {
                     method: 'GET',
-                    url: currentUrl,
+                    url: videoUrl,
                     responseType: 'stream',
-                    timeout: 20000,
+                    timeout: 25000,
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Range': 'bytes=0-', // 🔑 Bắt buộc đối với CDN ByteDance/Hồng Quả để tránh bị bóp/ngắt luồng 403
+                        'Range': 'bytes=0-', // 🔑 Bắt buộc đối với CDN ByteDance/Hồng Quả để tránh bị bóp/ngắt luồng
                         'Accept': 'video/webm,video/mp4,video/*;q=0.9,*/*;q=0.8',
                         'Accept-Encoding': 'identity;q=1, *;q=0',
                         'Sec-Fetch-Dest': 'video',
@@ -81,7 +81,7 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
                     }
                 };
 
-                if (proxyUrl) {
+                if (attempt.useProxy && proxyUrl) {
                     axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
                 }
 
@@ -95,23 +95,27 @@ async function downloadVideo(videoUrl, outputFilename, proxyUrl = null) {
                     writer.on('error', reject);
                 });
 
-                console.log(`[SUCCESS] Đã tải và lưu video thành công tại: ${outputPath}`);
+                console.log(`[SUCCESS] Đã tải và lưu video thành công (${attempt.desc}) tại: ${outputPath}`);
                 return outputPath;
             } catch (error) {
                 lastError = error;
-                console.log(`[WARN] Tải CDN lượt ${i + 1} không thành công (${error.message}), đang thử phương án tiếp...`);
+                console.log(`[WARN] Tải video thất bại (${attempt.desc}): ${error.message}`);
             }
         }
 
-        // Nếu tất cả các URL CDN đều lỗi
+        // Phân tích chi tiết nguyên nhân lỗi trả về
         let errorMsg = lastError ? lastError.message : "Không thể tải video từ máy chủ";
         if (lastError && lastError.response) {
             const status = lastError.response.status;
-            if ([403, 429, 401].includes(status)) {
-                errorMsg = `🛑 LỖI TẢI VIDEO (Mã ${status}): Máy chủ CDN từ chối kết nối. Hãy thử gán Cookie (/setcookie) hoặc đổi Proxy.`;
+            if (status === 502) {
+                errorMsg = `🛑 LỖI PROXY (Mã 502 Bad Gateway): Máy chủ Proxy hiện tại bị nghẽn mạng hoặc mất kết nối tới máy chủ video. Hãy gõ lệnh \`/newip\` để đổi IP mới.`;
+            } else if ([403, 429, 401].includes(status)) {
+                errorMsg = `🛑 LỖI BỊ CHẶN IP/WAF (Mã ${status}): Máy chủ video từ chối IP hiện tại. Hãy gõ lệnh \`/newip\` để đổi IP khác hoặc gõ \`/hdcookie\` để nạp Cookie.`;
+            } else if (status === 504) {
+                errorMsg = `🛑 LỖI TIMEOUT (Mã 504): Proxy phản hồi quá chậm, hãy gõ \`/newip\` để đổi Proxy nhanh hơn.`;
             }
         } else if (lastError && (lastError.message.toLowerCase().includes('timeout') || lastError.message.toLowerCase().includes('econnreset'))) {
-            errorMsg = `🛑 LỖI MẠNG: Kết nối tới CDN bị ngắt quãng, vui lòng thử lại.`;
+            errorMsg = `🛑 LỖI MẠNG: Kết nối tới máy chủ bị ngắt quãng hoặc Proxy bị ngưng. Hãy gõ \`/newip\` để thử lại.`;
         }
 
         console.error(`[ERROR] Thất bại khi tải luồng MP4:`, errorMsg);
