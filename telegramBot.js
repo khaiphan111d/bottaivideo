@@ -107,26 +107,43 @@ if (telegramToken) {
             const helpText = `
 📖 **HƯỚNG DẪN SỬ DỤNG BOT TẢI FULL VIDEO**
 
-**1. CÁCH TẢI VIDEO:**
+━━━━━━━━━━━━━━━━━━━━
+**1️⃣ CÁCH TẢI VIDEO:**
 🔸 Copy link video (Hồng Quả, Douyin, Kuaishou,...) và dán thẳng vào đây.
 🔸 Bot mặc định sử dụng **Cách 3 (App Native API)** để lấy Full Video không cắt 30s.
+*(Nếu video > 50MB, Bot sẽ tự động upload và tạo link tải tốc độ cao)*
 
-**2. CÁCH DÙNG PROXY (KIOTPROXY / PROXY302):**
-🔸 Gõ \`/hdproxy\` để xem hướng dẫn chi tiết cách lấy Key Proxy.
-🔸 Lệnh đổi Key: \`/setproxy MÃ_KEY_CỦA_BẠN\`
-🔸 Lệnh kiểm tra IP: \`/checkip\`
-🔸 Lệnh đổi IP mới: \`/newip\`
+━━━━━━━━━━━━━━━━━━━━
+**2️⃣ HƯỚNG DẪN LẤY & CÀI ĐẶT PROXY:**
+🔹 **Cách 1 - KiotProxy (Proxy xoay Việt Nam):**
+   1. Vào web \`https://kiotproxy.com\` đăng ký/đăng nhập.
+   2. Chọn mua gói **Proxy Xoay (Dynamic Proxy)**.
+   3. Copy chuỗi **API Key** (dạng \`K...\`, ví dụ: \`K79b98924b07...\`).
+   4. Gửi vào Bot: \`/setproxy MÃ_KEY\`
+🔹 **Cách 2 - Proxy302 (Proxy tĩnh):**
+   1. Vào web \`https://proxy302.com\` lấy Proxy dạng \`ip:port:user:pass\`.
+   2. Gửi vào Bot: \`/setproxy IP:PORT:USER:PASS\`
+🔹 **Lệnh Proxy:**
+   • \`/checkip\` : Kiểm tra IP Bot đang kết nối
+   • \`/newip\` : Ép đổi sang IP mới
 
-**3. PHÒNG KHI BỊ CHẶN / TẬP VIP (DÙNG COOKIE):**
-🔸 Gõ \`/hdcookie\` để xem hướng dẫn từng bước cách lấy chuỗi Cookie.
-🔸 Lệnh lưu Cookie: \`/setcookie [CHUỖI_COOKIE]\`
-🔸 Lệnh kiểm tra: \`/getcookie\`
-🔸 Lệnh xoá: \`/clearcookie\`
+━━━━━━━━━━━━━━━━━━━━
+**3️⃣ HƯỚNG DẪN LẤY & CÀI ĐẶT COOKIE (VƯỢT CHẶN 403 / TẬP VIP):**
+1. Mở máy tính, vào web \`https://novelquickapp.com\` (hoặc link phim Hồng Quả).
+2. Nhấn phím **F12** trên bàn phím (hoặc chuột phải chọn *Kiểm tra / Inspect*).
+3. Chọn thẻ **Network (Mạng)** ở thanh trên cùng ➔ Bấm **F5** để tải lại trang.
+4. Click vào dòng đầu tiên ➔ Chọn thẻ **Headers** ➔ Tìm mục **Request Headers** ➔ Tìm dòng **\`Cookie:\`**.
+5. Bôi đen và **Copy toàn bộ chuỗi ký tự** phía sau chữ \`Cookie:\`.
+6. Gửi vào Bot: \`/setcookie [CHUỖI_COOKIE_VỪA_COPY]\`
+🔹 **Lệnh Cookie:**
+   • \`/getcookie\` : Kiểm tra trạng thái Cookie hiện tại
+   • \`/clearcookie\` : Xoá Cookie đã lưu
 
-**4. QUẢN LÝ NGƯỜI DÙNG (CHỈ ADMIN):**
-🔹 \`/adduser [ID]\` - Cấp quyền cho người khác.
-🔹 \`/deluser [ID]\` - Thu hồi quyền.
-🔹 \`/listuser\` - Xem danh sách người dùng được phép.
+━━━━━━━━━━━━━━━━━━━━
+**4️⃣ QUẢN LÝ NGƯỜI DÙNG (CHỈ ADMIN):**
+🔹 \`/adduser [ID]\` : Cấp quyền cho người khác.
+🔹 \`/deluser [ID]\` : Thu hồi quyền sử dụng.
+🔹 \`/listuser\` : Xem danh sách người dùng được phép.
 `;
             bot.sendMessage(chatId, helpText, {parse_mode: 'Markdown'});
             return;
